@@ -1,0 +1,114 @@
+package com.hmdp.service.impl;
+
+import cn.hutool.core.util.BooleanUtil;
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONUtil;
+import com.hmdp.dto.Result;
+import com.hmdp.entity.Shop;
+import com.hmdp.mapper.ShopMapper;
+import com.hmdp.service.IShopService;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import javax.annotation.Resource;
+
+import java.util.concurrent.TimeUnit;
+
+import static com.hmdp.utils.RedisConstants.*;
+
+/**
+ * <p>
+ *  服务实现类
+ * </p>
+ *
+ * @author 虎哥
+ * @since 2021-12-22
+ */
+@Service
+public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IShopService {
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
+    @Override
+    public Result queryById(Long id) {
+        // 1.从redis中查询商铺缓存
+        String shopJson =stringRedisTemplate.opsForValue().get(CACHE_SHOP_KEY + id);
+        // 2.判断redis中是否存在
+        if(StrUtil.isNotBlank(shopJson)){
+            // 3.存在则直接返回,(把JSON字符串转成Java对象)
+            Shop shop = JSONUtil.toBean(shopJson, Shop.class);
+            return Result.ok(shop);
+        }
+        //判断命中是否是空值
+        if(shopJson != null){
+            return Result.fail("店铺不存在");
+        }
+        // 4.不存在则根据id查询mysql数据库
+        Shop shop = getById(id);
+        // 5.mysql不存在，返回错误
+        if (shop == null) {
+            //将空值写入redis，解决缓存穿透
+            stringRedisTemplate.opsForValue().set(CACHE_SHOP_KEY + id, "",CACHE_NULL_TTL, TimeUnit.MINUTES);
+            //返回错误信息
+            return Result.fail("店铺不存在");
+        }
+        // 6.mysql中存在，写入redis,(把Java对象转成JSON格式的字符串)
+        stringRedisTemplate.opsForValue().set(CACHE_SHOP_KEY + id, JSONUtil.toJsonStr(shop),CACHE_SHOP_TTL, TimeUnit.MINUTES);
+        // 7.返回数据
+        return Result.ok(shop);
+    }
+
+    @Override
+    @Transactional
+    public Result update(Shop shop) {
+        Long id = shop.getId();
+        if (id == null) {
+            return Result.fail("店铺id不能为空");
+        }
+        // 1.更新数据库
+        updateById(shop);
+        // 2.删除redis缓存
+        stringRedisTemplate.delete(CACHE_SHOP_KEY + id);
+        return Result.ok();
+    }
+
+    // 解决缓缓存穿透
+    public Shop queryWithPenetration(Long id) {
+        // 1.从redis中查询商铺缓存
+        String shopJson =stringRedisTemplate.opsForValue().get(CACHE_SHOP_KEY + id);
+        // 2.判断redis中是否存在
+        if(StrUtil.isNotBlank(shopJson)){
+            // 3.存在则直接返回,(把JSON字符串转成Java对象)
+            return JSONUtil.toBean(shopJson, Shop.class);
+        }
+        //判断命中是否是空值
+        if(shopJson != null){
+            return null;
+        }
+        // 4.不存在则根据id查询mysql数据库
+        Shop shop = getById(id);
+        // 5.mysql不存在，返回错误
+        if (shop == null) {
+            //将空值写入redis，解决缓存穿透
+            stringRedisTemplate.opsForValue().set(CACHE_SHOP_KEY + id, "",CACHE_NULL_TTL, TimeUnit.MINUTES);
+            //返回错误信息
+            return null;
+        }
+        // 6.mysql中存在，写入redis,(把Java对象转成JSON格式的字符串)
+        stringRedisTemplate.opsForValue().set(CACHE_SHOP_KEY + id, JSONUtil.toJsonStr(shop),CACHE_SHOP_TTL, TimeUnit.MINUTES);
+        // 7.返回数据
+        return shop;
+    }
+
+    // 实现互斥锁，获取锁成功则返回true，获取锁失败则返回false
+    private boolean tryLock(String key) {
+        Boolean flag = stringRedisTemplate.opsForValue().setIfAbsent(key, "1", 10, TimeUnit.SECONDS);
+        return BooleanUtil.isTrue(flag);   //将包装类转换成基本类型，避免空指针null，null会被当成false返回
+    }
+
+    // 释放锁
+    private void unLock(String key) {
+        stringRedisTemplate.delete(key);
+    }
+}
