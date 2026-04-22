@@ -30,7 +30,7 @@ public class Voucher implements Serializable {
     /**
      * 主键
      */
-    @TableId(value = "id", type = IdType.AUTO)
+    @TableId(value = "id", type = IdType.AUTO)   //标识主键，采用自增策略
     private Long id;
 
     /**
@@ -75,7 +75,7 @@ public class Voucher implements Serializable {
     /**
      * 库存
      */
-    @TableField(exist = false)
+    @TableField(exist = false)   //这个字段在数据库表中不存在，只是Java对象里用来临时使用的字段,不要参与SQL操作
     private Integer stock;
 
     /**

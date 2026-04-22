@@ -41,14 +41,14 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     private CacheClient cacheClient;
     @Override
     public Result queryById(Long id) {
-        // 互斥锁解决缓存穿透+解决缓存击穿
+        // 互斥锁解决缓存击穿+解决缓存穿透
 //        Shop shop = queryWithBreakdownByMutex(id);
 
         // 解决缓存穿透
 //        Shop shop = cacheClient.queryWithPenetration(
 //                CACHE_SHOP_KEY, id, Shop.class, this::getById, CACHE_SHOP_TTL, TimeUnit.MINUTES);
 
-        // 逻辑过期解决缓存穿透
+        // 逻辑过期解决缓存击穿
         Shop shop = cacheClient.queryWithBreakdownByLogicalExpire(
                 CACHE_SHOP_KEY, id, Shop.class, this::getById, 20L, TimeUnit.SECONDS);   //this::getById为方法的引用，即现成的方法直接拿来用；id1->getById(id1)为Lambda，自己写一个匿名函数；它们在这里的作用是等价的
         return Result.ok(shop);

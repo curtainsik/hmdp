@@ -72,7 +72,7 @@ public class CacheClient {
 
     //创建一个固定大小的线程池
     private static final ExecutorService CACHE_REBUILD_EXECUTOR = Executors.newFixedThreadPool(10);
-    // 根据指定的key查询缓存，并反序列化为指定类型，需要利用逻辑过期解决缓存击穿问题
+    // 根据指定的key查询缓存，并反序列化为指定类型，利用逻辑过期解决缓存击穿问题
     public <R,ID> R queryWithBreakdownByLogicalExpire(
             String keyPrefix, ID id, Class<R> type, Function<ID,R> dbFallback, Long time, TimeUnit unit) {
         String key = keyPrefix + id;

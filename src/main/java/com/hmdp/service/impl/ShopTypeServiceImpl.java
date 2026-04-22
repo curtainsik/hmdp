@@ -2,6 +2,7 @@ package com.hmdp.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.ShopType;
