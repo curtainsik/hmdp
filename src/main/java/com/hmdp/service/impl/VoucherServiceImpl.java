@@ -30,7 +30,7 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
     @Override
     public Result queryVoucherOfShop(Long shopId) {
         // 查询优惠券信息
-        List<Voucher> vouchers = getBaseMapper().queryVoucherOfShop(shopId);
+        List<Voucher> vouchers = getBaseMapper().queryVoucherOfShop(shopId);   //getBaseMapper()有mybatisplus提供，返回VoucherMapper
         // 返回结果
         return Result.ok(vouchers);
     }
