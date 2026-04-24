@@ -10,6 +10,8 @@ import com.hmdp.service.IVoucherOrderService;
 import com.hmdp.utils.RedisIdWorker;
 import com.hmdp.utils.SimpleRedisLock;
 import com.hmdp.utils.UserHolder;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -29,6 +31,9 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
     @Resource
     private StringRedisTemplate stringRedisTemplate;
+
+    @Resource
+    private RedissonClient redissonClient;
 
     @Override
     public Result seckillVoucher(Long voucherId) {
@@ -54,10 +59,23 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 //            return proxy.createVoucherOrder(voucherId);
 //        }
 
-        // 使用分布式锁
-        //创建锁对象
-        SimpleRedisLock lock = new SimpleRedisLock("order:" + userId, stringRedisTemplate);
-        boolean isLock = lock.tryLock(1200L);
+//        // 使用自己编写的分布式锁
+//        //创建锁对象
+//        SimpleRedisLock lock = new SimpleRedisLock("order:" + userId, stringRedisTemplate);
+//        boolean isLock = lock.tryLock(1200L);
+//        if (!isLock) {
+//            return Result.fail("不允许重复下单");
+//        }
+//        try {
+//            IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();   //获取当前数据的代理对象，只有代理对象才能让事务生效
+//            return proxy.createVoucherOrder(voucherId);
+//        } finally {
+//            lock.unLock();
+//        }
+
+        // 使用Redisson分布式锁
+        RLock lock = redissonClient.getLock("lock:order:" + userId);
+        boolean isLock = lock.tryLock();
         if (!isLock) {
             return Result.fail("不允许重复下单");
         }
@@ -65,7 +83,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();   //获取当前数据的代理对象，只有代理对象才能让事务生效
             return proxy.createVoucherOrder(voucherId);
         } finally {
-            lock.unLock();
+            lock.unlock();
         }
     }
 

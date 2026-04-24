@@ -22,10 +22,13 @@ public class SimpleRedisLock implements ILock{
 
     private static final String KEY_PREFIX = "lock:";
     private static final String ID_PREFIX = UUID.randomUUID().toString(true) + "-";
+    //Spring Data Redis提供的脚本封装类。 这里的泛型是Long，表示“这个Lua脚本执行后的返回值，Java端按Long接”
     private static final DefaultRedisScript<Long> UNLOCK_SCRIPT;
-    static {
+    static {   //类一加载，就把解锁脚本准备好
         UNLOCK_SCRIPT = new DefaultRedisScript<>();
+        //ClassPathResource(包装成资源)表示去资源目录找unlock.lua文件;setLocation(接收一个资源)把脚本文件的位置告诉DefaultRedisScript
         UNLOCK_SCRIPT.setLocation(new ClassPathResource("unlock.lua"));
+        //执行这个Lua脚本后，结果按Long接收
         UNLOCK_SCRIPT.setResultType(Long.class);
     }
     @Override
@@ -34,7 +37,7 @@ public class SimpleRedisLock implements ILock{
         String threadId =ID_PREFIX + Thread.currentThread().getId();   //这里Thread.currentThread().getId()在不同的tomcat中是有可能重复的，所以要加上UUID
         Boolean success = stringRedisTemplate.opsForValue().setIfAbsent(
                 KEY_PREFIX + name, threadId, timeoutSec, TimeUnit.SECONDS);
-        return Boolean.TRUE.equals(success);
+        return Boolean.TRUE.equals(success);   //如果success是null，不会抛出NullPointerException，而是返回false
     }
 
 //    @Override
@@ -54,7 +57,7 @@ public class SimpleRedisLock implements ILock{
         // 用lua脚本保证threadId.equals(id)判断与锁的释放的原子性
         stringRedisTemplate.execute(
                 UNLOCK_SCRIPT,
-                Collections.singletonList(KEY_PREFIX + name),
+                Collections.singletonList(KEY_PREFIX + name),   //返回一个只包含一个元素的不可变列表
                 ID_PREFIX + Thread.currentThread().getId());
     }
 }
