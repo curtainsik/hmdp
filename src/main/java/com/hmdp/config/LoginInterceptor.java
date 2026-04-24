@@ -22,6 +22,7 @@ import static com.hmdp.utils.RedisConstants.LOGIN_USER_KEY;
 import static com.hmdp.utils.RedisConstants.LOGIN_USER_TTL;
 
 /**
+ * 一个请求通常由 Tomcat 线程池里的一个线程来处理
  * 用户A请求到达
  *         ↓
  * Tomcat分配线程1
