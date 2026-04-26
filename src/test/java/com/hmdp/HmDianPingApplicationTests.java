@@ -3,12 +3,15 @@ package com.hmdp;
 import com.hmdp.service.impl.ShopServiceImpl;
 import com.hmdp.utils.CacheClient;
 import com.hmdp.utils.RedisIdWorker;
+import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import javax.annotation.Resource;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -24,31 +27,85 @@ class HmDianPingApplicationTests {
     @Resource
     private RedisIdWorker redisIdWorker;
 
-    private ExecutorService es = Executors.newFixedThreadPool(500);
+    private final ExecutorService es = Executors.newFixedThreadPool(500);
 
-    // 测试生成id的速度，以及是否重复
     @Test
     void testIdWorker() throws InterruptedException {
         CountDownLatch latch = new CountDownLatch(300);
         Runnable task = () -> {
-            for(int i=0;i<100;i++){
+            for (int i = 0; i < 100; i++) {
                 long id = redisIdWorker.nextId("order");
                 System.out.println("id = " + id);
             }
             latch.countDown();
         };
         long begin = System.currentTimeMillis();
-        for(int j=0;j<300;j++){
+        for (int j = 0; j < 300; j++) {
             es.submit(task);
         }
         latch.await();
         long end = System.currentTimeMillis();
-        System.out.println("耗时：" + (end - begin));
+        System.out.println("耗时: " + (end - begin));
     }
 
-    // 手动添加热点key，同时会添加逻辑过期时间
     @Test
     void testSaveShop() throws InterruptedException {
-        shopService.saveShopToRedis(1L,10L);
+        shopService.saveShopToRedis(1L, 10L);
+    }
+}
+
+@Slf4j
+@SpringBootTest
+class RedissonTest {
+
+    @Resource
+    private RedissonClient redissonClient;
+
+    @Resource
+    private RedissonClient redissonClient2;
+
+    @Resource
+    private RedissonClient redissonClient3;
+
+    private RLock lock;
+
+    @BeforeEach
+    void setUp() {
+        RLock lock1 = redissonClient.getLock("order");
+        RLock lock2 = redissonClient2.getLock("order");
+        RLock lock3 = redissonClient3.getLock("order");
+        lock = redissonClient.getMultiLock(lock1, lock2, lock3);
+    }
+
+    @Test
+    void method1() {
+        boolean isLock = lock.tryLock();
+        if (!isLock) {
+            log.error("获取锁失败...1");
+            return;
+        }
+        try {
+            log.info("获取锁成功...1");
+            method2();
+            log.info("开始执行业务...1");
+        } finally {
+            log.warn("准备释放锁...1");
+            lock.unlock();
+        }
+    }
+
+    void method2() {
+        boolean isLock = lock.tryLock();
+        if (!isLock) {
+            log.error("获取锁失败...2");
+            return;
+        }
+        try {
+            log.info("获取锁成功...2");
+            log.info("开始执行业务...2");
+        } finally {
+            log.warn("准备释放锁...2");
+            lock.unlock();
+        }
     }
 }
