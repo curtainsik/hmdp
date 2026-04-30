@@ -88,12 +88,12 @@ public class ShopController {
      */
     @GetMapping("/of/name")
     public Result queryShopByName(
-            @RequestParam(value = "name", required = false) String name,
+            @RequestParam(value = "name", required = false) String name,   // required = false表示此参数前端可传可不传
             @RequestParam(value = "current", defaultValue = "1") Integer current
     ) {
         // 根据类型分页查询
         Page<Shop> page = shopService.query()
-                .like(StrUtil.isNotBlank(name), "name", name)
+                .like(StrUtil.isNotBlank(name), "name", name)   // name非空时这个条件才生效
                 .page(new Page<>(current, SystemConstants.MAX_PAGE_SIZE));
         // 返回数据
         return Result.ok(page.getRecords());
